@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SPARTA Wonogiri - Dasbor Agroklimat</title>
+    
+    <style>
+        :root { 
+            --primary: #0f766e; 
+            --bg: #f8fafc; 
+            --card-bg: #ffffff; 
+        }
+        body { 
+            font-family: 'Segoe UI', Tahoma, sans-serif; 
+            margin: 0; 
+            background-color: var(--bg); 
+            display: flex; 
+            flex-direction: column; 
+            /* Mengubah height agar bisa di-scroll ke bawah di HP */
+            min-height: 100vh; 
+        }
+        header { 
+            background: var(--primary); 
+            color: white; 
+            padding: 15px 20px; 
+            text-align: center; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            z-index: 1000;
+            position: sticky; /* Membuat header tetap di atas saat di-scroll */
+            top: 0;
+        }
+        h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: 1px; }
+        p.subtitle { margin: 5px 0 0; font-size: 12px; opacity: 0.9; }
+        
+        #container { 
+            display: flex; 
+            flex-direction: column; /* Memaksa layout selalu atas-bawah (Mobile First) */
+            padding: 15px; 
+            gap: 15px; 
+            flex: 1;
+        }
+        
+        /* Area Grafik */
+        #chart-container { 
+            background: var(--card-bg); 
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .chart-title {
+            text-align: center;
+            font-size: 15px;
+            font-weight: bold;
+            color: #334155;
+            margin-bottom: 10px;
+        }
+        .canvas-wrapper {
+            width: 100%;
+            overflow-x: auto; /* Mengaktifkan swipe kanan-kiri di HP */
+            overflow-y: hidden;
+        }
+        .chart-inner {
+            /* Memaksa lebar grafik lebih panjang dari layar HP agar batang tidak gepeng */
+            width: 800px; 
+            height: 300px;
+        }
+        
+        /* Area Panel Detail */
+        #sidebar { 
+            background: var(--card-bg); 
+            border-radius: 12px;
+            padding: 20px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 20px;
+        }
+        
+        .select-kecamatan { 
+            width: 100%; 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: 2px solid var(--primary); 
+            font-size: 15px; 
+            font-weight: bold; 
+            color: #333; 
+            background-color: #f0fdfa; 
+            cursor: pointer; 
+            outline: none; 
+        }
+        
+        .card { background: #f1f5f9; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .card-title { font-size: 12px; color: #64748b; text-transform: uppercase; margin-bottom: 5px; font-weight: 600; }
+        .card-value { font-size: 18px; font-weight: bold; color: #0f172a; }
+        
+        #waktu-update { 
+            font-size: 12px; 
+            color: #64748b; 
+            text-align: center; 
+            margin-top: 10px; 
+            padding-top: 15px; 
+            border-top: 1px solid #e2e8f0; 
+        }
+        
+        .risk-badge { 
+            padding: 12px; 
+            border-radius: 6px; 
+            font-weight: bold; 
+            text-align: center; 
+            color: white; 
+            margin-top: 5px; 
+            font-size: 14px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .risk-aman { background-color: #00c900; }
+        .risk-waspada { background-color: #e69100; }
+        .risk-bahaya { background-color: #db0000; }
+        
+        .placeholder-text { text-align: center; color: #64748b; margin-top: 20px; line-height: 1.6; font-size: 14px; }
+        .placeholder-text span { font-size: 30px; display: block; margin-bottom: 10px; }
+
+        /* Tampilan khusus untuk layar Laptop/Desktop (Lebar) */
+        @media (min-width: 769px) { 
+            #container { flex-direction: row; height: calc(100vh - 70px); overflow: hidden; } 
+            #chart-container { flex: 2; height: 100%; }
+            #sidebar { flex: 1; max-width: 400px; height: 100%; overflow-y: auto; margin-bottom: 0; }
+            .chart-inner { width: 100%; height: 100%; } /* Grafik menyesuaikan layar di laptop */
+            .canvas-wrapper { overflow-x: visible; height: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>SPARTA</h1>
+        <p class="subtitle">Sistem Prediksi Agroklimat & Rekomendasi</p>
+    </header>
+    
+    <div id="container">
+        <!-- Area Grafik Batang -->
+        <div id="chart-container">
+            <div class="chart-title">Curah Hujan (mm/bulan)</div>
+            <div class="canvas-wrapper">
+                <!-- Wrapper dalam untuk memungkinkan swipe di HP -->
+                <div class="chart-inner">
+                    <canvas id="spartaChart"></canvas>
+                </div>
+            </div>
+            <p style="text-align: center; font-size: 11px; color: #94a3b8; margin: 10px 0 0 0;">Geser grafik ke kanan/kiri ↔️</p>
+        </div>
+        
+        <!-- Panel Detail -->
+        <div id="sidebar">
+            <select id="pilih-kecamatan" class="select-kecamatan">
+                <option value="" selected disabled>-- Pilih Kecamatan --</option>
+            </select>
+
+            <div id="default-msg" class="placeholder-text">
+                <span>📊</span>
+                Pilih kecamatan dari menu di atas atau klik salah satu batang grafik.
+            </div>
+            
+            <div id="detail-content" style="display: none;">
+                <h2 id="kecamatan-name" style="margin-top: 0; font-size: 20px; color: var(--primary); border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Kecamatan</h2>
+                
+                <div class="card">
+                    <div class="card-title">Prediksi Curah Hujan</div>
+                    <div class="card-value" id="val-hujan">- mm/bulan</div>
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <div class="card" style="flex: 1;">
+                        <div class="card-title">Suhu</div>
+                        <div class="card-value" id="val-suhu">- &deg;C</div>
+                    </div>
+                    <div class="card" style="flex: 1;">
+                        <div class="card-title">Kelembaban</div>
+                        <div class="card-value" id="val-lembab">- %</div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">Sinar Matahari</div>
+                    <div class="card-value" id="val-matahari">- Jam/Hari</div>
+                </div>
+                
+                <div class="card" style="border-left: 4px solid var(--primary);">
+                    <div class="card-title">Rekomendasi Tanam</div>
+                    <div class="card-value" id="val-rekomendasi">🌾 -</div>
+                </div>
+                
+                <div id="val-risiko" class="risk-badge risk-aman">Status Risiko</div>
+            </div>
+            
+            <div id="waktu-update">Terakhir diperbarui: -</div>
+        </div>
+    </div>
+
+    <!-- Pustaka JS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    
+    <script>
+        // LOGIKA KODE SAMA PERSIS TANPA DIUBAH
+        let databaseKecamatan = {};
+        let myChart = null;
+
+        function tampilkanDetail(namaKecamatan) {
+            const data = databaseKecamatan[namaKecamatan];
+            if (!data) return;
+
+            document.getElementById('default-msg').style.display = 'none';
+            document.getElementById('detail-content').style.display = 'block';
+            
+            document.getElementById('kecamatan-name').innerText = namaKecamatan;
+            document.getElementById('val-hujan').innerText = data.hujan;
+            document.getElementById('val-suhu').innerText = data.suhu;
+            document.getElementById('val-lembab').innerText = data.lembab;
+            document.getElementById('val-matahari').innerText = data.matahari;
+            document.getElementById('val-rekomendasi').innerText = data.rekomendasi;
+            
+            const riskEl = document.getElementById('val-risiko');
+            riskEl.innerText = data.risiko;
+            riskEl.className = 'risk-badge ' + data.riskClass;
+            
+            document.getElementById('waktu-update').innerText = "Terakhir diperbarui: " + data.waktu;
+            document.getElementById('pilih-kecamatan').value = namaKecamatan;
+        }
+
+        document.getElementById('pilih-kecamatan').addEventListener('change', function(e) {
+            tampilkanDetail(e.target.value);
+        });
+
+        const SPREADSHEET_ID = '19Rxb9KDK01GJy5ojMzVvkZxQAN89B7E51QXGeLyd2Ds'; 
+        const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
+
+        Papa.parse(CSV_URL, {
+            download: true, 
+            header: false,
+            complete: function(results) {
+                const data = results.data;
+                const dropdown = document.getElementById('pilih-kecamatan');
+                
+                let namaKecamatanList = [];
+                let angkaHujanList = [];
+                let warnaGrafikList = [];
+                
+                for(let i = 1; i < data.length; i++) {
+                    const row = data[i];
+                    if(row.length < 10) continue; 
+
+                    const nama = row[0]; 
+                    const hujanStr = row[3];
+                    const hujanAngka = parseFloat(hujanStr.toString().replace(/[^0-9.-]+/g,"")) || 0;
+                    
+                    let riskClass = 'risk-aman'; 
+                    let fillColor = '#10b981'; 
+                    const lowerRisiko = (row[8] ? row[8].toString() : '').toLowerCase();
+                    
+                    if(lowerRisiko.includes('waspada')) { 
+                        riskClass = 'risk-waspada'; 
+                        fillColor = '#f59e0b'; 
+                    } else if(lowerRisiko.includes('bahaya')) { 
+                        riskClass = 'risk-bahaya'; 
+                        fillColor = '#ef4444'; 
+                    }
+
+                    databaseKecamatan[nama] = { 
+                        hujan: row[3], suhu: row[4], lembab: row[5], 
+                        matahari: row[6], rekomendasi: row[7], 
+                        risiko: row[8], waktu: row[9], 
+                        riskClass: riskClass, fillColor: fillColor 
+                    };
+
+                    namaKecamatanList.push(nama);
+                    angkaHujanList.push(hujanAngka);
+                    warnaGrafikList.push(fillColor);
+                }
+
+                const sortedNames = [...namaKecamatanList].sort();
+                sortedNames.forEach(nama => {
+                    const opt = document.createElement('option');
+                    opt.value = nama; 
+                    opt.textContent = nama; 
+                    dropdown.appendChild(opt);
+                });
+
+                renderGrafik(namaKecamatanList, angkaHujanList, warnaGrafikList);
+            }
+        });
+
+        function renderGrafik(labels, dataHujan, warnaBackground) {
+            const ctx = document.getElementById('spartaChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Curah Hujan',
+                        data: dataHujan,
+                        backgroundColor: warnaBackground,
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderColor: '#cbd5e1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.parsed.y + ' mm/bulan';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: false }
+                        },
+                        x: {
+                            ticks: { autoSkip: false, maxRotation: 90, minRotation: 45 }
+                        }
+                    },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            const namaKecamatan = labels[index];
+                            tampilkanDetail(namaKecamatan);
+                            
+                            // Scroll otomatis ke bawah (ke bagian detail) saat grafik diklik di HP
+                            if (window.innerWidth <= 768) {
+                                document.getElementById('sidebar').scrollIntoView({ behavior: 'smooth' });
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
